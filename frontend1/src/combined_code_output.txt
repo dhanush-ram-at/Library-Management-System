@@ -1,0 +1,1605 @@
+📁 
+📄 App.tsx
+<code>
+// import { Routes, Route, Navigate } from "react-router-dom"
+// import Login from "./pages/login"
+// import Register from "./pages/register"
+// import AdminDashboard from "./pages/AdminDashboard"
+// import MemberDashboard from "./pages/MemberDashboard"
+// import ProtectedRoute from "./routes/protectedroute"
+// import { PAGE_ROUTES } from "./routes/apiRoutes"
+
+// function App() {
+//   const token = localStorage.getItem("token")
+//   const user  = JSON.parse(localStorage.getItem("user") || "{}")
+
+//   const home = () => {
+//     if (!token) return PAGE_ROUTES.LOGIN
+//     return user.role === "ADMIN"
+//       ? PAGE_ROUTES.ADMIN_DASHBOARD
+//       : PAGE_ROUTES.MEMBER_DASHBOARD
+//   }
+
+//   return (
+//     <Routes>
+//       <Route path="/" element={<Navigate to={home()} replace />} />
+//       <Route path={PAGE_ROUTES.LOGIN}
+//         element={token ? <Navigate to={home()} replace /> : <Login />} />
+//       <Route path={PAGE_ROUTES.REGISTER} element={<Register />} />
+
+//       <Route path={PAGE_ROUTES.ADMIN_DASHBOARD}
+//         element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
+
+//       <Route path={PAGE_ROUTES.MEMBER_DASHBOARD}
+//         element={<ProtectedRoute role="MEMBER"><MemberDashboard /></ProtectedRoute>} />
+
+//       <Route path="*" element={<Navigate to={PAGE_ROUTES.LOGIN} replace />} />
+//     </Routes>
+//   )
+// }
+
+// export default App
+
+
+import { Routes, Route, Navigate } from "react-router-dom"
+import Login from "./pages/login"
+import Register from "./pages/register"
+import AdminDashboard from "./pages/AdminDashboard"
+import MemberDashboard from "./pages/MemberDashboard"
+import ProtectedRoute from "./routes/protectedroute"
+import { PAGE_ROUTES } from "./routes/apiRoutes"
+
+function App() {
+  const token = localStorage.getItem("token")
+
+  let user = null
+  try {
+    const userData = localStorage.getItem("user")
+    user = userData && userData !== "undefined"
+      ? JSON.parse(userData)
+      : null
+  } catch {
+    user = null
+  }
+
+  const home = () => {
+    if (!token) return PAGE_ROUTES.LOGIN
+    return user?.role === "ADMIN"
+      ? PAGE_ROUTES.ADMIN_DASHBOARD
+      : PAGE_ROUTES.MEMBER_DASHBOARD
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to={home()} replace />} />
+
+      <Route
+        path={PAGE_ROUTES.LOGIN}
+        element={token ? <Navigate to={home()} replace /> : <Login />}
+      />
+
+      <Route path={PAGE_ROUTES.REGISTER} element={<Register />} />
+
+      <Route
+        path={PAGE_ROUTES.ADMIN_DASHBOARD}
+        element={
+          <ProtectedRoute role="ADMIN">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={PAGE_ROUTES.MEMBER_DASHBOARD}
+        element={
+          <ProtectedRoute role="MEMBER">
+            <MemberDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to={PAGE_ROUTES.LOGIN} replace />} />
+    </Routes>
+  )
+}
+
+export default App
+</code>
+
+======================================================================
+
+📁 
+📄 main.tsx
+<code>
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import { BrowserRouter } from "react-router-dom"
+import App from "./App.tsx"
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </StrictMode>
+)
+</code>
+
+======================================================================
+
+📁 components\admin
+📄 AvailableBooksTable.tsx
+<code>
+import { Box, Chip, Paper } from "@mui/material"
+import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid"
+import { useEffect, useState } from "react"
+import Swal from "sweetalert2"
+import { getBooks } from "../../services/api"
+import BookFilters from "./BookFilters"
+import { tableStyles } from "../../constants/styles/tableStyles"
+
+type Book = { id: number; book_code: string; title: string; author_name: string;
+              total_copies: number; available_copies: number; status: string }
+
+type FilterType = { page: number; search: string; status: string; sort: string }
+
+const DEFAULT_FILTERS: FilterType = { page: 1, search: "", status: "", sort: "created_at" }
+
+function AvailableBooksTable() {
+  const [books, setBooks] = useState<Book[]>([])
+  const [total, setTotal] = useState(0)
+  const [filters, setFilters] = useState<FilterType>(DEFAULT_FILTERS)
+
+  const loadBooks = async () => {
+    try {
+      const res = await getBooks(filters)
+      setBooks(res.data.data)
+      setTotal(res.data.total)
+    } catch {
+      Swal.fire({ icon: "error", title: "Error", text: "Failed to load books." })
+    }
+  }
+
+  useEffect(() => { loadBooks() }, [filters])
+
+  const columns: GridColDef[] = [
+    {
+      field: "sno", headerName: "S.No", width: 70, sortable: false,
+      renderCell: (params: GridRenderCellParams) =>
+        (filters.page - 1) * 10 + books.findIndex((b) => b.id === params.row.id) + 1,
+    },
+    { field: "title",  headerName: "Title", width: 200 },
+    { field: "author_name", headerName: "Author", width: 160 },
+    { field: "total_copies", headerName: "Total Copies", width: 120 },
+    { field: "available_copies",headerName: "Available Copies", width: 140 },
+    {
+      field: "status", headerName: "Status", width: 110,
+      renderCell: (params: GridRenderCellParams) => (
+        <Chip
+          label={params.value} size="small"
+          color={params.value === "Active" ? "success" : "default"}
+        />
+      ),
+    },
+  ]
+
+  return (
+    <Box>
+      <BookFilters filters={filters} setFilters={setFilters}
+        onReset={() => setFilters(DEFAULT_FILTERS)} />
+
+      <Paper variant="outlined" sx={tableStyles.tablePaper}>
+        <DataGrid
+          rows={books} columns={columns}
+          getRowId={(row) => row.id}
+          rowCount={total}
+          pageSizeOptions={[10]}
+          paginationMode="server"
+          paginationModel={{ page: filters.page - 1, pageSize: 10 }}
+          onPaginationModelChange={(model) =>
+            setFilters((prev) => ({
+                ...prev,
+                page: model.page + 1
+            }))
+            }
+          disableRowSelectionOnClick autoHeight
+          sx={tableStyles.dataGrid}
+        />
+      </Paper>
+    </Box>
+  )
+}
+
+export default AvailableBooksTable
+</code>
+
+======================================================================
+
+📁 components\admin
+📄 BookFilters.tsx
+<code>
+import { Box, TextField, Paper } from "@mui/material"
+import AppSelect from "../common/AppSelect"
+import AppButton from "../common/AppButton"
+import { filterStyles } from "../../constants/styles/filterStyles"
+
+type BookFiltersType = { page: number; search: string; status: string; sort: string }
+
+type Props = {
+  filters: BookFiltersType
+  setFilters: (f: BookFiltersType) => void
+  onReset: () => void
+}
+
+const STATUS_OPTIONS = [
+  { value: "",         label: "All Statuses" },
+  { value: "Active",   label: "Active"       },
+  { value: "Inactive", label: "Inactive"     },
+]
+
+const SORT_OPTIONS = [
+  { value: "created_at", label: "Newest First" },
+  { value: "title",      label: "Title A-Z"    },
+]
+
+function BookFilters({ filters, setFilters, onReset }: Props) {
+  const handleChange = (field: keyof BookFiltersType, value: string | number) => {
+    setFilters({ ...filters, [field]: value, page: 1 })
+  }
+
+  return (
+    <Paper variant="outlined" sx={filterStyles.filterPaper}>
+      <Box sx={filterStyles.filterRow}>
+
+        <TextField
+          label="Search by title or author" size="small"
+          value={filters.search}
+          onChange={(e) => handleChange("search", e.target.value)}
+          sx={filterStyles.searchField}
+        />
+
+        <AppSelect
+          label="Status" value={filters.status}
+          onChange={(val) => handleChange("status", val)}
+          options={STATUS_OPTIONS} size="small" width={150}
+        />
+
+        <AppSelect
+          label="Sort By" value={filters.sort}
+          onChange={(val) => handleChange("sort", val)}
+          options={SORT_OPTIONS} size="small" width={150}
+        />
+
+        <AppButton variant="outlined" size="small" onClick={onReset}
+          sx={filterStyles.resetButton}>
+          Reset
+        </AppButton>
+
+      </Box>
+    </Paper>
+  )
+}
+
+export default BookFilters
+</code>
+
+======================================================================
+
+📁 components\admin
+📄 IssueFilters.tsx
+<code>
+import { Box, TextField, Paper } from "@mui/material"
+import AppSelect from "../common/AppSelect"
+import AppButton from "../common/AppButton"
+import type { IssueFilters } from "../../types/issue"
+import { filterStyles } from "../../constants/styles/filterStyles"
+
+type Props = {
+  filters: IssueFilters
+  setFilters: (f: IssueFilters) => void
+  onReset: () => void
+}
+
+const STATUS_OPTIONS = [
+  { value: "",         label: "All"      },
+  { value: "Issued",   label: "Issued"   },
+  { value: "Returned", label: "Returned" },
+]
+
+const SORT_OPTIONS = [
+  { value: "created_at", label: "Created Date" },
+  { value: "due_date",   label: "Due Date"     },
+  { value: "issue_date", label: "Issue Date"   },
+]
+
+function IssueFilters({ filters, setFilters, onReset }: Props) {
+  const handleChange = (field: keyof IssueFilters, value: string | number) => {
+    setFilters({ ...filters, [field]: value, page: 1 })
+  }
+
+  return (
+    <Paper variant="outlined" sx={filterStyles.filterPaper}>
+      <Box sx={filterStyles.filterRow}>
+
+        <TextField
+          label="Search by member name" size="small"
+          value={filters.search}
+          onChange={(e) => handleChange("search", e.target.value)}
+          sx={filterStyles.searchField}
+        />
+
+        <AppSelect
+          label="Status" value={filters.status}
+          onChange={(val) => handleChange("status", val)}
+          options={STATUS_OPTIONS} size="small" width={140}
+        />
+
+        <AppSelect
+          label="Sort By" value={filters.sort}
+          onChange={(val) => handleChange("sort", val)}
+          options={SORT_OPTIONS} size="small" width={150}
+        />
+
+        <AppButton variant="outlined" size="small" onClick={onReset}
+          sx={filterStyles.resetButton}>
+          Reset
+        </AppButton>
+
+      </Box>
+    </Paper>
+  )
+}
+
+export default IssueFilters;
+</code>
+
+======================================================================
+
+📁 components\admin
+📄 LendBookDialog.tsx
+<code>
+import { Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material"
+import { useState, useEffect } from "react"
+import Swal from "sweetalert2"
+import { getBooksDropdown, lendBook } from "../../services/api"
+import AppSelect from "../common/AppSelect"
+import AppTextField from "../common/AppTextField"
+import AppButton from "../common/AppButton"
+import { COLORS } from "../../constants/styles/theme"
+import { dialogStyles } from "../../constants/styles/dialogStyles"
+
+type Props = {
+  open: boolean
+  setOpen: (v: boolean) => void
+  reloadIssues: () => void
+}
+
+function LendBookDialog({ open, setOpen, reloadIssues }: Props) {
+  const [books,    setBooks]    = useState<{ id: number; title: string }[]>([])
+  const [bookId,   setBookId]   = useState("")
+  const [issuedTo, setIssuedTo] = useState("")
+  const [bookErr,  setBookErr]  = useState("")
+  const [nameErr,  setNameErr]  = useState("")
+
+  // load books for dropdown when dialog opens
+  useEffect(() => {
+    if (open) {
+      setBookId(""); setIssuedTo(""); setBookErr(""); setNameErr("")
+      getBooksDropdown()
+        .then((res) => setBooks(res.data.data))
+        .catch(() => setBooks([]))
+    }
+  }, [open])
+
+  const validate = () => {
+    let ok = true
+    setBookErr(""); setNameErr("")
+    if (!bookId)            { setBookErr("Please select a book"); ok = false }
+    if (!issuedTo.trim())   { setNameErr("Member name is required"); ok = false }
+    return ok
+  }
+
+  const handleLend = async () => {
+    if (!validate()) return
+    try {
+      await lendBook({ book_id: parseInt(bookId), issued_to: issuedTo })
+      await Swal.fire({
+        icon: "success", title: "Book Issued!",
+        timer: 1500, showConfirmButton: false,
+      })
+      setOpen(false)
+      reloadIssues() // refresh the Lended Books table
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Failed to issue book."
+      Swal.fire({ icon: "error", title: "Error", text: msg, confirmButtonColor: COLORS.error })
+    }
+  }
+
+  const bookOptions = books.map((b) => ({ value: String(b.id), label: b.title }))
+
+  return (
+    <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
+      <DialogTitle sx={dialogStyles.lendTitle}>Lend Book</DialogTitle>
+
+      <DialogContent>
+        {/* book dropdown */}
+        <AppSelect
+          label="Select Book" value={bookId}
+          onChange={(val) => { setBookId(val); setBookErr("") }}
+          options={[{ value: "", label: "-- Select a Book --" }, ...bookOptions]}
+          error={bookErr}
+        />
+
+        {/* member name */}
+        <AppTextField
+          label="Member Name" name="issued_to" value={issuedTo}
+          onChange={(e) => { setIssuedTo(e.target.value); setNameErr("") }}
+          error={!!nameErr} helperText={nameErr}
+        />
+      </DialogContent>
+
+      <DialogActions sx={dialogStyles.actions}>
+        <AppButton variant="outlined" onClick={() => setOpen(false)}>Cancel</AppButton>
+        <AppButton onClick={handleLend}>Issue Book</AppButton>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+export default LendBookDialog
+</code>
+
+======================================================================
+
+📁 components\admin
+📄 LendedBooksTable.tsx
+<code>
+import { Box, Chip, Paper } from "@mui/material"
+import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid"
+import { useEffect, useState } from "react"
+import Swal from "sweetalert2"
+import { getIssues, returnBook, deleteIssue } from "../../services/api"
+import IssueFilters from "./IssueFilters"
+import LendBookDialog from "./LendBookDialog"
+import AppButton from "../common/AppButton"
+import type { Issue, IssueFilters as FilterType } from "../../types/issue"
+import { COLORS, ISSUE_STATUS_COLORS, DELAY_STATUS_COLORS } from "../../constants/styles/theme"
+import { tableStyles } from "../../constants/styles/tableStyles"
+
+const DEFAULT_FILTERS: FilterType = {
+  page: 1, search: "", status: "", filter: "", sort: "created_at",
+}
+
+function LendedBooksTable() {
+  const [issues,    setIssues]    = useState<Issue[]>([])
+  const [total,     setTotal]     = useState(0)
+  const [filters,   setFilters]   = useState<FilterType>(DEFAULT_FILTERS)
+  const [openLend,  setOpenLend]  = useState(false)
+
+  const loadIssues = async () => {
+    try {
+      const res = await getIssues(filters)
+      setIssues(res.data.data)
+      setTotal(res.data.total)
+    } catch {
+      Swal.fire({ icon: "error", title: "Error", text: "Failed to load issued books." })
+    }
+  }
+
+  useEffect(() => { loadIssues() }, [filters])
+
+  // ── RETURN BOOK
+  const handleReturn = (issue: Issue) => {
+    Swal.fire({
+      title: "Return Book?",
+      text:  `Return "${issue.book_title}" issued to ${issue.issued_to}?`,
+      icon:  "question", showCancelButton: true,
+      confirmButtonText: "Yes, Return", cancelButtonText: "No",
+      confirmButtonColor: COLORS.primary,
+    }).then(async (result) => {
+      if (!result.isConfirmed) return
+      try {
+        await returnBook(issue.id)
+        await Swal.fire({ icon: "success", title: "Returned!", timer: 1500, showConfirmButton: false })
+        loadIssues()
+      } catch (err: any) {
+        const msg = err.response?.data?.message || "Failed to return book."
+        Swal.fire({ icon: "error", title: "Error", text: msg, confirmButtonColor: COLORS.error })
+      }
+    })
+  }
+
+  // ── SOFT DELETE
+  const handleDelete = (issue: Issue) => {
+    Swal.fire({
+      title: "Delete Record?",
+      text:  "This will soft delete the issue record.",
+      icon:  "warning", showCancelButton: true,
+      confirmButtonText: "Yes, Delete", cancelButtonText: "No",
+      confirmButtonColor: COLORS.error,
+    }).then(async (result) => {
+      if (!result.isConfirmed) return
+      try {
+        await deleteIssue(issue.id)
+        await Swal.fire({ icon: "success", title: "Deleted!", timer: 1500, showConfirmButton: false })
+        loadIssues()
+      } catch (err: any) {
+        const msg = err.response?.data?.message || "Failed to delete."
+        Swal.fire({ icon: "error", title: "Error", text: msg, confirmButtonColor: COLORS.error })
+      }
+    })
+  }
+
+  const columns: GridColDef[] = [
+    {
+      field: "sno", headerName: "S.No", width: 70, sortable: false,
+      renderCell: (params: GridRenderCellParams) =>
+        (filters.page - 1) * 10 + issues.findIndex((i) => i.id === params.row.id) + 1,
+    },
+    { field: "book_title",  headerName: "Book Name",  width: 180 },
+    { field: "issued_to",   headerName: "Issued To",  width: 140 },
+    {
+      field: "issue_date", headerName: "Issue Date", width: 120,
+      renderCell: (p: GridRenderCellParams) => new Date(p.value).toLocaleDateString(),
+    },
+    {
+      field: "due_date", headerName: "Due Date", width: 120,
+      renderCell: (p: GridRenderCellParams) => new Date(p.value).toLocaleDateString(),
+    },
+    {
+      field: "return_date", headerName: "Return Date", width: 120,
+      renderCell: (p: GridRenderCellParams) =>
+        p.value ? new Date(p.value).toLocaleDateString() : "—",
+    },
+    {
+      field: "issue_status", headerName: "Status", width: 110,
+      renderCell: (p: GridRenderCellParams) => (
+        <Chip label={p.value} size="small"
+          color={ISSUE_STATUS_COLORS[p.value as string] ?? "default"} />
+      ),
+    },
+    {
+      field: "delay_status", headerName: "Delay", width: 110,
+      renderCell: (p: GridRenderCellParams) =>
+        p.value ? (
+          <Chip label={p.value} size="small"
+            color={DELAY_STATUS_COLORS[p.value as string] ?? "default"} />
+        ) : "—",
+    },
+    {
+      field: "penalty", headerName: "Penalty (₹)", width: 110,
+      renderCell: (p: GridRenderCellParams) => p.value > 0 ? `₹ ${p.value}` : "—",
+    },
+    {
+      field: "actions", headerName: "Actions", width: 180, sortable: false,
+      renderCell: (p: GridRenderCellParams) => {
+        const issue = p.row as Issue
+        return (
+          <Box sx={tableStyles.actionCell}>
+            {/* Return button — disabled if already returned */}
+            <AppButton size="small"
+              onClick={() => handleReturn(issue)}
+              disabled={issue.issue_status === "Returned"}>
+              Return
+            </AppButton>
+            {/* Delete button — soft delete */}
+            <AppButton size="small" color="error"
+              onClick={() => handleDelete(issue)}>
+              Delete
+            </AppButton>
+          </Box>
+        )
+      },
+    },
+  ]
+
+  return (
+    <Box>
+      {/* Lend Book button at the top */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+        <AppButton onClick={() => setOpenLend(true)}>+ Lend Book</AppButton>
+      </Box>
+
+      <IssueFilters filters={filters} setFilters={setFilters}
+        onReset={() => setFilters(DEFAULT_FILTERS)} />
+
+      <Paper variant="outlined" sx={tableStyles.tablePaper}>
+        <DataGrid
+          rows={issues} columns={columns}
+          getRowId={(row) => row.id}
+          rowCount={total}
+          pageSizeOptions={[10]}
+          paginationMode="server"
+          paginationModel={{ page: filters.page - 1, pageSize: 10 }}
+          onPaginationModelChange={(model) =>
+            setFilters({ ...filters, page: model.page + 1 })
+          }
+          disableRowSelectionOnClick autoHeight
+          sx={tableStyles.dataGrid}
+        />
+      </Paper>
+
+      {/* Lend Book Dialog */}
+      <LendBookDialog open={openLend} setOpen={setOpenLend} reloadIssues={loadIssues} />
+    </Box>
+  )
+}
+
+export default LendedBooksTable
+</code>
+
+======================================================================
+
+📁 components\common
+📄 AppButton.tsx
+<code>
+import { Button } from "@mui/material"
+
+type Props = {
+  children: React.ReactNode
+  onClick?:  () => void
+  variant?:  "contained" | "outlined" | "text"
+  color?:    "primary" | "error" | "warning" | "success" | "inherit"
+  fullWidth?: boolean
+  disabled?:  boolean
+  size?:      "small" | "medium" | "large"
+  sx?:        object
+}
+
+function AppButton({
+  children, onClick,
+  variant = "contained", color = "primary",
+  fullWidth = false, disabled = false, size = "medium", sx = {},
+}: Props) {
+  return (
+    <Button variant={variant} color={color} onClick={onClick}
+      fullWidth={fullWidth} disabled={disabled} size={size} sx={sx}>
+      {children}
+    </Button>
+  )
+}
+
+export default AppButton
+</code>
+
+======================================================================
+
+📁 components\common
+📄 AppSelect.tsx
+<code>
+import { FormControl, InputLabel, Select, MenuItem, FormHelperText } from "@mui/material"
+
+type Option = { value: string | number; label: string }
+
+type Props = {
+  label: string; value: string | number
+  onChange: (value: string) => void
+  options: Option[]; error?: string
+  size?: "small" | "medium"; width?: number | string
+}
+
+function AppSelect({ label, value, onChange, options, error, size = "medium", width }: Props) {
+  return (
+    <FormControl fullWidth={!width} size={size} error={!!error}
+      sx={{ mt: 2, ...(width ? { width } : {}) }}>
+      <InputLabel>{label}</InputLabel>
+      <Select label={label} value={value} onChange={(e) => onChange(String(e.target.value))}>
+        {options.map((opt) => (
+          <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+        ))}
+      </Select>
+      {error && <FormHelperText>{error}</FormHelperText>}
+    </FormControl>
+  )
+}
+
+export default AppSelect
+</code>
+
+======================================================================
+
+📁 components\common
+📄 AppTextField.tsx
+<code>
+import { TextField } from "@mui/material"
+
+type Props = {
+  label: string; 
+  name: string; 
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  type?: string; 
+  error?: boolean; 
+  helperText?: string
+}
+
+function AppTextField({ label, name, value, onChange, type = "text", error, helperText }: Props) {
+  return (
+    <TextField fullWidth label={label} name={name} value={value} onChange={onChange}
+      type={type} error={error} helperText={helperText}
+      {...(type === "date" && { InputLabelProps: { shrink: true }})}
+      sx={{ mt: 2 }} />
+  )
+}
+
+export default AppTextField
+</code>
+
+======================================================================
+
+📁 components\member
+📄 MemberBooksTable.tsx
+<code>
+// Same as AvailableBooksTable but read-only — no actions
+// Member can search, filter, and sort available books
+import AvailableBooksTable from "../admin/AvailableBooksTable"
+export default AvailableBooksTable
+</code>
+
+======================================================================
+
+📁 components\member
+📄 MemberIssueTable.tsx
+<code>
+import { Box, Chip, Paper } from "@mui/material"
+import { DataGrid, type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid"
+import { useEffect, useState } from "react"
+import Swal from "sweetalert2"
+import { getIssues } from "../../services/api"
+import type { Issue, IssueFilters as FilterType } from "../../types/issue"
+import { ISSUE_STATUS_COLORS, DELAY_STATUS_COLORS } from "../../constants/styles/theme"
+import { tableStyles } from "../../constants/styles/tableStyles"
+import IssueFilters from "../admin/IssueFilters"
+
+// Member can only VIEW — no return, no delete
+const DEFAULT_FILTERS: FilterType = {
+  page: 1, search: "", status: "", filter: "", sort: "created_at",
+}
+
+function MemberIssueTable() {
+  const [issues,  setIssues]  = useState<Issue[]>([])
+  const [total,   setTotal]   = useState(0)
+  const [filters, setFilters] = useState<FilterType>(DEFAULT_FILTERS)
+
+  const loadIssues = async () => {
+    try {
+      // backend filters by user_id automatically for MEMBER role
+      const res = await getIssues(filters)
+      setIssues(res.data.data)
+      setTotal(res.data.total)
+    } catch {
+      Swal.fire({ icon: "error", title: "Error", text: "Failed to load your books." })
+    }
+  }
+
+  useEffect(() => { loadIssues() }, [filters])
+
+  const columns: GridColDef[] = [
+    {
+      field: "sno", headerName: "S.No", width: 70, sortable: false,
+      renderCell: (p: GridRenderCellParams) =>
+        (filters.page - 1) * 10 + issues.findIndex((i) => i.id === p.row.id) + 1,
+    },
+    { field: "book_title", headerName: "Book Name", width: 200 },
+    {
+      field: "issue_date", headerName: "Issue Date", width: 120,
+      renderCell: (p: GridRenderCellParams) => new Date(p.value).toLocaleDateString(),
+    },
+    {
+      field: "due_date", headerName: "Due Date", width: 120,
+      renderCell: (p: GridRenderCellParams) => new Date(p.value).toLocaleDateString(),
+    },
+    {
+      field: "return_date", headerName: "Return Date", width: 120,
+      renderCell: (p: GridRenderCellParams) =>
+        p.value ? new Date(p.value).toLocaleDateString() : "—",
+    },
+    {
+      field: "issue_status", headerName: "Status", width: 110,
+      renderCell: (p: GridRenderCellParams) => (
+        <Chip label={p.value} size="small"
+          color={ISSUE_STATUS_COLORS[p.value as string] ?? "default"} />
+      ),
+    },
+    {
+      field: "delay_status", headerName: "Delay Status", width: 120,
+      renderCell: (p: GridRenderCellParams) =>
+        p.value ? (
+          <Chip label={p.value} size="small"
+            color={DELAY_STATUS_COLORS[p.value as string] ?? "default"} />
+        ) : "—",
+    },
+    {
+      field: "penalty", headerName: "Penalty (₹)", width: 110,
+      renderCell: (p: GridRenderCellParams) => p.value > 0 ? `₹ ${p.value}` : "—",
+    },
+    // ❌ No actions column — members can only view
+  ]
+
+  return (
+    <Box>
+      <IssueFilters filters={filters} setFilters={setFilters}
+        onReset={() => setFilters(DEFAULT_FILTERS)} />
+
+      <Paper variant="outlined" sx={tableStyles.tablePaper}>
+        <DataGrid
+          rows={issues} columns={columns}
+          getRowId={(row) => row.id}
+          rowCount={total}
+          pageSizeOptions={[10]}
+          paginationMode="server"
+          paginationModel={{ page: filters.page - 1, pageSize: 10 }}
+          onPaginationModelChange={(model) =>
+            setFilters({ ...filters, page: model.page + 1 })
+          }
+          disableRowSelectionOnClick autoHeight
+          sx={tableStyles.dataGrid}
+        />
+      </Paper>
+    </Box>
+  )
+}
+
+export default MemberIssueTable
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 authStyles.ts
+<code>
+import { COLORS } from "./theme"
+
+export const authStyles = {
+  pageWrapper: {
+    minHeight: "100vh", background: COLORS.background,
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  card: {
+    p: 4, width: 400, borderRadius: 3,
+    boxShadow: "0 2px 16px rgba(0,0,0,0.10)",
+  },
+  title:    { textAlign: "center", fontWeight: 700, color: COLORS.primary, mb: 1 },
+  subtitle: { textAlign: "center", color: COLORS.textSecondary, mb: 3, fontSize: 14 },
+  errorText:       { color: "error.main", fontSize: 13, mt: 1 },
+  primaryButton:   { mt: 3, py: 1.2, fontSize: 15 },
+  secondaryButton: { py: 1.2 },
+  divider:     { my: 2 },
+  dividerText: { fontSize: 12, color: COLORS.textSecondary },
+  roleNote:    { fontSize: 12, color: COLORS.textSecondary, mt: 1 },
+}
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 dashboardStyles.ts
+<code>
+import { COLORS } from "./theme"
+
+export const dashboardStyles = {
+  pageWrapper: { 
+    background: COLORS.background, 
+    minHeight: "calc(100vh - 64px)", 
+    p: 2 ,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+},
+
+  pageTitle:   { fontWeight: 700, color: COLORS.primary, mb: 2 },
+  sectionTitle: { fontWeight: 700, color: COLORS.primary, mb: 1, mt: 3 },
+  welcomeBanner: {
+    p: 3, mb: 3, borderRadius: 2,
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+  },
+  welcomeTitle:    { fontWeight: 700, color: COLORS.primary },
+  welcomeSubtitle: { color: COLORS.textSecondary, fontSize: 14, mt: 0.5 },
+}
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 dialogStyles.ts
+<code>
+import { COLORS } from "./theme"
+
+export const dialogStyles = {
+  lendTitle:   { fontWeight: 700, color: COLORS.primary },
+  deleteTitle: { fontWeight: 700, color: COLORS.error },
+  actions:     { p: 2, gap: 1 },
+  field:       { mt: 2 },
+}
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 filterStyles.ts
+<code>
+export const filterStyles = {
+  filterPaper: { p: 2, borderRadius: 2 },
+  filterRow:   { display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" },
+  searchField: { width: 240, mt: 0 },
+  resetButton: { mt: 0, height: 40 },
+}
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 navbarStyles.ts
+<code>
+import { COLORS } from "./theme"
+
+export const navbarStyles = {
+  appBar: { background: COLORS.primary },
+  title:  { flexGrow: 1, fontWeight: 700, letterSpacing: 0.5 },
+  rightSection: { display: "flex", alignItems: "center", gap: 1.5 },
+  userName:   { color: COLORS.white, fontWeight: 500 },
+  adminChip:  { background: COLORS.warning, color: COLORS.white, fontWeight: 600, fontSize: 11 },
+  memberChip: { background: COLORS.success, color: COLORS.white, fontWeight: 600, fontSize: 11 },
+  logoutButton: { borderColor: "rgba(255,255,255,0.6)", color: COLORS.white },
+}
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 tableStyles.ts
+<code>
+import { COLORS } from "./theme"
+
+export const tableStyles = {
+  tablePaper: { mt: 2, borderRadius: 2, overflow: "hidden" },
+  dataGrid: {
+    border: 0,
+    "& .MuiDataGrid-columnHeaders": { background: COLORS.tableHeader, fontWeight: 700 },
+    "& .MuiDataGrid-row:hover":     { background: COLORS.rowHover },
+  },
+  actionCell: { display: "flex", gap: 0.8, alignItems: "center", height: "100%" },
+}
+</code>
+
+======================================================================
+
+📁 constants\styles
+📄 theme.ts
+<code>
+export const COLORS = {
+  primary:       "#1976d2",
+  primaryDark:   "#115293",
+  success:       "#2e7d32",
+  warning:       "#ed6c02",
+  error:         "#d32f2f",
+  white:         "#ffffff",
+  background:    "#f5f5f5",
+  surface:       "#ffffff",
+  textPrimary:   "#212121",
+  textSecondary: "#757575",
+  border:        "#e0e0e0",
+  rowHover:      "#f0f7ff",
+  tableHeader:   "#f5f5f5",
+}
+
+// Status chip colors for issue_status column
+export const ISSUE_STATUS_COLORS: Record<string, "success" | "warning"> = {
+  Returned: "success",
+  Issued:   "warning",
+}
+
+// Delay chip colors for delay_status column
+export const DELAY_STATUS_COLORS: Record<string, "success" | "error"> = {
+  "On Time": "success",
+  "Delayed": "error",
+}
+</code>
+
+======================================================================
+
+📁 layouts
+📄 Navbar.tsx
+<code>
+import { AppBar, Toolbar, Typography, Box, Chip } from "@mui/material"
+import Swal from "sweetalert2"
+import { PAGE_ROUTES } from "../Routes/apiRoutes"
+import AppButton from "../components/common/AppButton"
+import { COLORS } from "../constants/styles/theme"
+import { navbarStyles } from "../constants/styles/navbarStyles"
+
+function Navbar() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}")
+
+  const handleLogout = () => {
+    Swal.fire({
+      title: "Logout?", text: "Are you sure you want to logout?",
+      icon: "question", showCancelButton: true,
+      confirmButtonText: "Yes, Logout", cancelButtonText: "Stay",
+      confirmButtonColor: COLORS.error,
+    }).then((result) => {
+      if (result.isConfirmed) {
+        localStorage.clear()
+        window.location.href = PAGE_ROUTES.LOGIN
+      }
+    })
+  }
+
+  return (
+    <AppBar position="static" sx={navbarStyles.appBar}>
+      <Toolbar>
+
+        <Typography variant="h6" sx={navbarStyles.title}>
+          Library Management System
+        </Typography>
+
+        <Box sx={navbarStyles.rightSection}>
+
+          {/* show user name */}
+          <Typography sx={navbarStyles.userName}>{user.name}</Typography>
+
+          {/* orange chip for ADMIN, green chip for MEMBER */}
+          <Chip
+            label={user.role}
+            size="small"
+            sx={user.role === "ADMIN" ? navbarStyles.adminChip : navbarStyles.memberChip}
+          />
+
+          <AppButton
+            variant="outlined" color="inherit" size="small"
+            onClick={handleLogout} sx={navbarStyles.logoutButton}
+          >
+            Logout
+          </AppButton>
+
+        </Box>
+      </Toolbar>
+    </AppBar>
+  )
+}
+
+export default Navbar
+</code>
+
+======================================================================
+
+📁 pages
+📄 AdminDashboard.tsx
+<code>
+import { Box, Typography } from "@mui/material"
+import Navbar from "../layouts/Navbar"
+import AvailableBooksTable from "../components/admin/AvailableBooksTable"
+import LendedBooksTable from "../components/admin/LendedBooksTable"
+import { dashboardStyles } from "../constants/styles/dashboardStyles"
+
+function AdminDashboard() {
+  return (
+    <>
+      <Navbar />
+      <Box sx={dashboardStyles.pageWrapper}>
+
+        {/* TABLE 1: Available Books */}
+        <Typography variant="h5" sx={dashboardStyles.pageTitle}>
+          📚 Available Books
+        </Typography>
+        <AvailableBooksTable />
+
+        {/* TABLE 2: Lended Books — with Return + Delete actions */}
+        <Typography variant="h5" sx={dashboardStyles.sectionTitle}>
+          📤 Lended Books
+        </Typography>
+        <LendedBooksTable />
+
+      </Box>
+    </>
+  )
+}
+
+export default AdminDashboard
+</code>
+
+======================================================================
+
+📁 pages
+📄 login.tsx
+<code>
+import { useState } from "react"
+import { Box, Paper, Typography, Divider } from "@mui/material"
+import axios from "axios"
+import { API_ROUTES, PAGE_ROUTES } from "../routes/apiRoutes"
+import AppTextField from "../components/common/AppTextField"
+import AppButton from "../components/common/AppButton"
+import { authStyles } from "../constants/styles/authStyles"
+
+function Login() {
+  const [email,    setEmail]    = useState("")
+  const [password, setPassword] = useState("")
+  const [emailErr, setEmailErr] = useState("")
+  const [passErr,  setPassErr]  = useState("")
+  const [loginErr, setLoginErr] = useState("")
+
+  const validate = () => {
+    let ok = true
+    setEmailErr(""); setPassErr(""); setLoginErr("")
+    if (!email.trim())    { setEmailErr("Email is required");    ok = false }
+    if (!password.trim()) { setPassErr("Password is required");  ok = false }
+    return ok
+  }
+
+  const handleLogin = async () => {
+    if (!validate()) return
+    try {
+      const res = await axios.post(API_ROUTES.AUTH.LOGIN, { email, password })
+      localStorage.setItem("token",        res.data.accessToken)
+      localStorage.setItem("refreshToken", res.data.refreshToken)
+      localStorage.setItem("user",         JSON.stringify(res.data.user))
+      // redirect based on role
+      window.location.href = res.data.user.role === "ADMIN"
+        ? PAGE_ROUTES.ADMIN_DASHBOARD
+        : PAGE_ROUTES.MEMBER_DASHBOARD
+    } catch {
+      setLoginErr("Invalid email or password")
+    }
+  }
+
+  return (
+    <Box sx={authStyles.pageWrapper}>
+      <Paper sx={authStyles.card}>
+        <Typography variant="h5" sx={authStyles.title}>Library Management System</Typography>
+        <Typography sx={authStyles.subtitle}>Sign in to continue</Typography>
+
+        <AppTextField label="Email" name="email" value={email}
+          onChange={(e) => { setEmail(e.target.value); setEmailErr("") }}
+          error={!!emailErr} helperText={emailErr} />
+
+        <AppTextField label="Password" name="password" type="password" value={password}
+          onChange={(e) => { setPassword(e.target.value); setPassErr("") }}
+          error={!!passErr} helperText={passErr} />
+
+        {loginErr && <Typography sx={authStyles.errorText}>{loginErr}</Typography>}
+
+        <AppButton fullWidth onClick={handleLogin} sx={authStyles.primaryButton}>Login</AppButton>
+
+        <Divider sx={authStyles.divider}>
+          <Typography sx={authStyles.dividerText}>OR</Typography>
+        </Divider>
+
+        <AppButton fullWidth variant="outlined"
+          onClick={() => window.location.href = PAGE_ROUTES.REGISTER}
+          sx={authStyles.secondaryButton}>
+          Create New Account
+        </AppButton>
+      </Paper>
+    </Box>
+  )
+}
+
+export default Login
+</code>
+
+======================================================================
+
+📁 pages
+📄 MemberDashboard.tsx
+<code>
+import { Box, Typography, Paper } from "@mui/material"
+import Navbar from "../layouts/Navbar"
+import AvailableBooksTable from "../components/admin/AvailableBooksTable"
+import MemberIssueTable from "../components/member/MemberIssueTable"
+import { dashboardStyles } from "../constants/styles/dashboardStyles"
+
+function MemberDashboard() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}")
+
+  return (
+    <>
+      <Navbar />
+      <Box sx={dashboardStyles.pageWrapper}>
+
+        {/* Welcome banner */}
+        <Paper variant="outlined" sx={dashboardStyles.welcomeBanner}>
+          <Box>
+            <Typography variant="h5" sx={dashboardStyles.welcomeTitle}>
+              Welcome, {user.name}!
+            </Typography>
+            <Typography sx={dashboardStyles.welcomeSubtitle}>
+              View available books and your borrowed books below
+            </Typography>
+          </Box>
+        </Paper>
+
+        {/* TABLE 1: Available Books — read only */}
+        <Typography variant="h5" sx={dashboardStyles.pageTitle}>
+          📚 Available Books
+        </Typography>
+        <AvailableBooksTable />
+
+        {/* TABLE 2: My Books — read only, no actions */}
+        <Typography variant="h5" sx={dashboardStyles.sectionTitle}>
+          📤 My Borrowed Books
+        </Typography>
+        <MemberIssueTable />
+
+      </Box>
+    </>
+  )
+}
+
+export default MemberDashboard
+</code>
+
+======================================================================
+
+📁 pages
+📄 register.tsx
+<code>
+import { useState } from "react"
+import { Box, Paper, Typography, Divider } from "@mui/material"
+import Swal from "sweetalert2"
+import { PAGE_ROUTES } from "../routes/apiRoutes"
+import { registerUser } from "../services/api"
+import AppTextField from "../components/common/AppTextField"
+import AppButton from "../components/common/AppButton"
+import { COLORS } from "../constants/styles/theme"
+import { authStyles } from "../constants/styles/authStyles"
+
+function Register() {
+  const [name, setName]       = useState("")
+  const [email, setEmail]     = useState("")
+  const [password, setPassword] = useState("")
+  const [nameErr, setNameErr]  = useState("")
+  const [emailErr, setEmailErr] = useState("")
+  const [passErr,  setPassErr]  = useState("")
+
+  const validate = () => {
+    let ok = true
+    setNameErr(""); setEmailErr(""); setPassErr("")
+    if (!name.trim())  { setNameErr("Name is required");    ok = false }
+    if (!email.trim()) { setEmailErr("Email is required");  ok = false }
+    else if (!email.includes("@")) { setEmailErr("Enter a valid email"); ok = false }
+    if (!password)                 { setPassErr("Password is required"); ok = false }
+    else if (password.length < 6)  { setPassErr("Minimum 6 characters"); ok = false }
+    return ok
+  }
+
+  const handleRegister = async () => {
+    if (!validate()) return
+    try {
+      await registerUser({ name, email, password })
+      await Swal.fire({
+        icon: "success", title: "Account Created!",
+        text: "You can now login.", confirmButtonText: "Go to Login",
+        confirmButtonColor: COLORS.primary,
+      })
+      window.location.href = PAGE_ROUTES.LOGIN
+    } catch (err: any) {
+      Swal.fire({
+        icon: "error", title: "Register Failed",
+        text: err?.response?.data?.message || "Something went wrong.",
+        confirmButtonColor: COLORS.error,
+      })
+    }
+  }
+
+  return (
+    <Box sx={authStyles.pageWrapper}>
+      <Paper sx={authStyles.card}>
+        <Typography variant="h5" sx={authStyles.title}>Create Account</Typography>
+        <Typography sx={authStyles.subtitle}>Register as a new member</Typography>
+
+        <AppTextField label="Full Name" name="name" value={name}
+          onChange={(e) => { setName(e.target.value); setNameErr("") }}
+          error={!!nameErr} helperText={nameErr} />
+
+        <AppTextField label="Email" name="email" value={email}
+          onChange={(e) => { setEmail(e.target.value); setEmailErr("") }}
+          error={!!emailErr} helperText={emailErr} />
+
+        <AppTextField label="Password" name="password" type="password" value={password}
+          onChange={(e) => { setPassword(e.target.value); setPassErr("") }}
+          error={!!passErr} helperText={passErr} />
+
+        <Typography sx={authStyles.roleNote}>Role: Member (default)</Typography>
+
+        <AppButton fullWidth onClick={handleRegister} sx={authStyles.primaryButton}>Register</AppButton>
+
+        <Divider sx={authStyles.divider}>
+          <Typography sx={authStyles.dividerText}>OR</Typography>
+        </Divider>
+
+        <AppButton fullWidth variant="outlined"
+          onClick={() => window.location.href = PAGE_ROUTES.LOGIN}
+          sx={authStyles.secondaryButton}>
+          Back to Login
+        </AppButton>
+      </Paper>
+    </Box>
+  )
+}
+
+export default Register
+</code>
+
+======================================================================
+
+📁 routes
+📄 apiRoutes.ts
+<code>
+const BASE = "http://localhost:5000/api/v1"
+
+export const API_ROUTES = {
+  AUTH: {
+    LOGIN:    `${BASE}/auth/login`,
+    REGISTER: `${BASE}/auth/register`,
+    REFRESH:  `${BASE}/auth/refresh`,
+  },
+  BOOKS: {
+    BASE:     `${BASE}/books`,
+    DROPDOWN: `${BASE}/books/dropdown`,
+  },
+  ISSUES: {
+    BASE:   `${BASE}/issues`,
+    LEND:   `${BASE}/issues/lend`,
+    RETURN: (id: number) => `${BASE}/issues/${id}/return`,
+    DELETE: (id: number) => `${BASE}/issues/${id}`,
+  },
+}
+
+export const PAGE_ROUTES = {
+  LOGIN:            "/login",
+  REGISTER:         "/register",
+  ADMIN_DASHBOARD:  "/admin",
+  MEMBER_DASHBOARD: "/member",
+}
+
+export default API_ROUTES
+</code>
+
+======================================================================
+
+📁 routes
+📄 protectedroute.tsx
+<code>
+import { Navigate } from "react-router-dom"
+import { PAGE_ROUTES } from "./apiRoutes"
+
+type Props = { children: JSX.Element; role?: "ADMIN" | "MEMBER" }
+
+function ProtectedRoute({ children, role }: Props) {
+  const token = localStorage.getItem("token")
+  const user  = JSON.parse(localStorage.getItem("user") || "{}")
+
+  if (!token) return <Navigate to={PAGE_ROUTES.LOGIN} replace />
+
+  if (role && user.role !== role) {
+    const correct = user.role === "ADMIN"
+      ? PAGE_ROUTES.ADMIN_DASHBOARD
+      : PAGE_ROUTES.MEMBER_DASHBOARD
+    return <Navigate to={correct} replace />
+  }
+
+  return children
+}
+
+export default ProtectedRoute
+</code>
+
+======================================================================
+
+📁 services
+📄 api.ts
+<code>
+import axios from "axios"
+import API_ROUTES from "../routes/apiRoutes"
+
+// ── axios instance — token is attached automatically
+export const api = axios.create({ baseURL: "http://localhost:5000" })
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token")
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+// ── auto-refresh on 401
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error.config
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true
+      try {
+        const refreshToken = localStorage.getItem("refreshToken")
+        const res = await axios.post(API_ROUTES.AUTH.REFRESH, { refreshToken })
+        localStorage.setItem("token", res.data.accessToken)
+        original.headers.Authorization = `Bearer ${res.data.accessToken}`
+        return api(original)
+      } catch {
+        localStorage.clear()
+        window.location.href = "/login"
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+// ── AUTH
+export const registerUser = (data: { name: string; email: string; password: string }) =>
+  axios.post(API_ROUTES.AUTH.REGISTER, { ...data, role: "MEMBER" })
+
+// ── BOOKS
+export const getBooks = (params: {
+  page?: number; search?: string; status?: string; sort?: string
+}) => api.get(API_ROUTES.BOOKS.BASE, { params })
+
+export const getBooksDropdown = () =>
+  api.get(API_ROUTES.BOOKS.DROPDOWN)
+
+// ── ISSUES
+export const getIssues = (params: {
+  page?: number; search?: string; status?: string; filter?: string; sort?: string
+}) => api.get(API_ROUTES.ISSUES.BASE, { params })
+
+export const lendBook = (data: { book_id: number; issued_to: string }) =>
+  api.post(API_ROUTES.ISSUES.LEND, data)
+
+export const returnBook = (id: number) =>
+  api.put(API_ROUTES.ISSUES.RETURN(id), {})
+
+export const deleteIssue = (id: number) =>
+  api.delete(API_ROUTES.ISSUES.DELETE(id))
+</code>
+
+======================================================================
+
+📁 types
+📄 issue.ts
+<code>
+export type Issue = {
+  id:           number
+  issue_code:   string
+  book_id:      number
+  user_id:      number
+  issued_to:    string
+  book_title:   string | null
+  issue_date:   string
+  due_date:     string
+  return_date:  string | null
+  issue_status: string        // "Issued" or "Returned"
+  delay_days:   number
+  delay_status: string | null // "On Time" or "Delayed" or null
+  penalty:      number
+  created_at:   string
+}
+
+export type IssueFilters = {
+  page:   number
+  search: string
+  status: string   // "Issued" | "Returned" | ""
+  filter: string   // "delayed" | "on_time" | ""
+  sort:   string
+}
+</code>
+
+======================================================================
+
+app.tsx
+// import { Routes, Route, Navigate } from "react-router-dom"
+// import Login from "./pages/login"
+// import Register from "./pages/register"
+// import AdminDashboard from "./pages/AdminDashboard"
+// import MemberDashboard from "./pages/MemberDashboard"
+// import ProtectedRoute from "./routes/protectedroute"
+// import { PAGE_ROUTES } from "./routes/apiRoutes"
+
+// function App() {
+//   const token = localStorage.getItem("token")
+//   const user  = JSON.parse(localStorage.getItem("user") || "{}")
+
+//   const home = () => {
+//     if (!token) return PAGE_ROUTES.LOGIN
+//     return user.role === "ADMIN"
+//       ? PAGE_ROUTES.ADMIN_DASHBOARD
+//       : PAGE_ROUTES.MEMBER_DASHBOARD
+//   }
+
+//   return (
+//     <Routes>
+//       <Route path="/" element={<Navigate to={home()} replace />} />
+//       <Route path={PAGE_ROUTES.LOGIN}
+//         element={token ? <Navigate to={home()} replace /> : <Login />} />
+//       <Route path={PAGE_ROUTES.REGISTER} element={<Register />} />
+
+//       <Route path={PAGE_ROUTES.ADMIN_DASHBOARD}
+//         element={<ProtectedRoute role="ADMIN"><AdminDashboard /></ProtectedRoute>} />
+
+//       <Route path={PAGE_ROUTES.MEMBER_DASHBOARD}
+//         element={<ProtectedRoute role="MEMBER"><MemberDashboard /></ProtectedRoute>} />
+
+//       <Route path="*" element={<Navigate to={PAGE_ROUTES.LOGIN} replace />} />
+//     </Routes>
+//   )
+// }
+
+// export default App
+
+
+import { Routes, Route, Navigate } from "react-router-dom"
+import Login from "./pages/login"
+import Register from "./pages/register"
+import AdminDashboard from "./pages/AdminDashboard"
+import MemberDashboard from "./pages/MemberDashboard"
+import ProtectedRoute from "./routes/protectedroute"
+import { PAGE_ROUTES } from "./routes/apiRoutes"
+
+function App() {
+  const token = localStorage.getItem("token")
+
+  let user = null
+  try {
+    const userData = localStorage.getItem("user")
+    user = userData && userData !== "undefined"
+      ? JSON.parse(userData)
+      : null
+  } catch {
+    user = null
+  }
+
+  const home = () => {
+    if (!token) return PAGE_ROUTES.LOGIN
+    return user?.role === "ADMIN"
+      ? PAGE_ROUTES.ADMIN_DASHBOARD
+      : PAGE_ROUTES.MEMBER_DASHBOARD
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to={home()} replace />} />
+
+      <Route
+        path={PAGE_ROUTES.LOGIN}
+        element={token ? <Navigate to={home()} replace /> : <Login />}
+      />
+
+      <Route path={PAGE_ROUTES.REGISTER} element={<Register />} />
+
+      <Route
+        path={PAGE_ROUTES.ADMIN_DASHBOARD}
+        element={
+          <ProtectedRoute role="ADMIN">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path={PAGE_ROUTES.MEMBER_DASHBOARD}
+        element={
+          <ProtectedRoute role="MEMBER">
+            <MemberDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to={PAGE_ROUTES.LOGIN} replace />} />
+    </Routes>
+  )
+}
+
+export default App
+
+===========================================================================================
+main.tsx
+
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import { BrowserRouter } from "react-router-dom"
+import App from "./App.tsx"
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </StrictMode>
+)
