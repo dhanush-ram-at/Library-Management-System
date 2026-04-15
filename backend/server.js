@@ -1,7 +1,6 @@
+const app  = require("./app");
+require("dotenv").config();   // load .env variables first
 
-//require("dotenv").config();   // load .env variables first
-
-const app  = require("../backend/App");
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

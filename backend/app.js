@@ -4,15 +4,15 @@ const app = express();
 require("dotenv").config();
 
 // middlewares
-const { jsonParser, urlencodedParser } = require("./middlewares/bodyParser");
-const errorHandler = require("./middlewares/errorHandler");
-const notFound = require("./middlewares/notFoundMiddleware");
+const { jsonParser, urlencodedParser } = require("./src/middlewares/bodyParser");
+const errorHandler = require("./src/middlewares/errorHandler");
+const notFound = require("./src/middlewares/notFoundMiddleware");
 
 // routes
-const authRoutes  = require("./routes/authRoutes");
-const bookRoutes  = require("./routes/bookRoutes");
-const issueRoutes = require("./routes/issueRoutes");
-const userRoutes = require("./routes/userRoutes");
+const authRoutes  = require("./src/routes/authRoutes");
+const bookRoutes  = require("./src/routes/bookRoutes");
+const returnRoutes = require("./src/routes/returnRoutes");
+//const userRoutes = require("./routes/userRoutes");
 
 // Body Parsers
 app.use(jsonParser);       
@@ -43,11 +43,11 @@ app.use("/api/v1/books", bookRoutes);
 
 // Issues → /api/v1/issues
 //          /api/v1/issues/:id/return
-app.use("/api/v1/issues", issueRoutes);
+app.use("/api/v1/return", returnRoutes);
 
 //to get the user names
 //           /api/v1/users
-app.use("/api/v1/users", userRoutes);
+//app.use("/api/v1/users", userRoutes);
 
 // 5. 404 Handler
 
